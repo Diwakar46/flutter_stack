@@ -10,6 +10,7 @@ import 'package:flutter_stack/bloc/theme/theme_bloc.dart';
 import 'package:flutter_stack/bloc/theme/theme_event.dart';
 import 'package:flutter_stack/bloc/theme/theme_state.dart';
 import 'package:flutter_stack/utils/code_themes.dart';
+import 'package:flutter_stack/utils/syntax_highlighter.dart';
 // Conditional imports for web-specific functionality
 import 'package:flutter_stack/utils/web_utils_stub.dart'
     if (dart.library.html) 'package:flutter_stack/utils/web_utils_web.dart';
@@ -229,12 +230,11 @@ $cleaned''';
               child: Container(
                 padding: const EdgeInsets.all(12),
                 width: double.infinity,
-                child: SelectableText(
-                       _currentContent,
-                  style: TextStyle(
-                    fontFamily: 'Consolas, Monaco, monospace',
-                    fontSize: 14,
-                    color: VSCodeThemes.getTextColor(isDark),
+                child: SelectableText.rich(
+                  SyntaxHighlighter.highlight(
+                    _currentContent,
+                    SyntaxHighlighter.getLanguageFromFilename(_currentFilename),
+                    isDark,
                   ),
                 ),
               ),
@@ -395,6 +395,7 @@ $cleaned''';
       ],
     );
   }
+
 
   IconData _getFileIcon(String extension) {
     switch (extension.toLowerCase()) {
@@ -574,12 +575,16 @@ $cleaned''';
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
+      final brightness = Theme.of(context).brightness;
+
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+      backgroundColor: brightness == Brightness.dark 
+          ? const Color(0xFF0E161F) // dark mode → dark blue
+          : Colors.white,
+          title: Row(
         children: [   
           Image.asset('assets/flutter_stack_logo.png',  height: 32,),
         ],

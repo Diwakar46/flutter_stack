@@ -12,6 +12,7 @@ class ThemeState {
   static ThemeState get light => ThemeState(
     themeData: ThemeData(
       colorScheme: ColorScheme.fromSeed(
+        
         seedColor: Colors.deepPurple,
         brightness: Brightness.light,
       ),
@@ -23,7 +24,7 @@ class ThemeState {
   static ThemeState get dark => ThemeState(
     themeData: ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.deepPurple,
+        seedColor: const Color(0xFF0E161F),
         brightness: Brightness.dark,
       ),
       useMaterial3: true,
