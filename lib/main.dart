@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_stack/bloc/load_code/bloc/load_code_bloc.dart';
+import 'package:flutter_stack/bloc/theme/theme_bloc.dart';
+import 'package:flutter_stack/bloc/theme/theme_state.dart';
 import 'package:flutter_stack/repository/apiGitHubRepository.dart';
 
 import 'pages/preview_page.dart';
@@ -15,17 +17,26 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'GitHub File Preview',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: BlocProvider(
-        create: (context) => GitHubBloc(
-          repository: ApiGitHubRepository(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (context) => ThemeBloc(),
         ),
-        child: const PreviewPage(),
+        BlocProvider(
+          create: (context) => GitHubBloc(
+            repository: ApiGitHubRepository(),
+          ),
+        ),
+      ],
+      child: BlocBuilder<ThemeBloc, ThemeState>(
+        builder: (context, themeState) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'GitHub File Preview',
+            theme: themeState.themeData,
+            home: const PreviewPage(),
+          );
+        },
       ),
     );
   }
