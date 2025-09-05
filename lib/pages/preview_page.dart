@@ -5,15 +5,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_highlight/flutter_highlight.dart';
 import 'package:flutter_stack/bloc/load_code/bloc/load_code_bloc.dart';
 import 'package:flutter_stack/bloc/theme/theme_bloc.dart';
 import 'package:flutter_stack/bloc/theme/theme_event.dart';
 import 'package:flutter_stack/bloc/theme/theme_state.dart';
+import 'package:flutter_stack/utils/code_themes.dart';
 // Conditional imports for web-specific functionality
 import 'package:flutter_stack/utils/web_utils_stub.dart'
     if (dart.library.html) 'package:flutter_stack/utils/web_utils_web.dart';
-import 'package:flutter_stack/utils/code_themes.dart';
 
 class PreviewPage extends StatefulWidget {
   const PreviewPage({super.key});
@@ -32,14 +31,14 @@ class _PreviewPageState extends State<PreviewPage> {
   double _splitRatio = 0.4; // 60% for code, 40% for DartPad
   final String _dartPadViewId = 'dartpad-iframe';
   final TextEditingController _urlController = TextEditingController();
+  bool _showUrlField = false;
   @override
   void initState() {
     super.initState();
     
-    // Set default URL for testing
-    
     if (kIsWeb) {
       _initializeDartPadForWeb();
+      _checkForUrlParameter();
     }
   }
 
@@ -105,44 +104,7 @@ class _PreviewPageState extends State<PreviewPage> {
     );
   }
 
-  void _copyToDartPad() async {
-    if (!_isFlutterCode || !_isDartPadReady || !kIsWeb) return;
-    
-    try {
-      // Clean the code for DartPad
-      String cleanedCode = _prepareCodeForDartPad(_currentContent);
-      
-      // Find the iframe and inject code
-      final iframe = document.querySelector('iframe[src*="dartpad.dev"]') as IFrameElement?;
-      if (iframe != null) {
-        // Use postMessage to communicate with DartPad
-        final message = {
-          'type': 'sourceCode',
-          'sourceCode': {
-            'main.dart': cleanedCode,
-          }
-        };
-        
-        iframe.contentWindow?.postMessage(message, 'https://dartpad.dev');
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Code sent to DartPad! Click Run to execute.'),
-            duration: Duration(seconds: 3),
-          ),
-        );
-      } else {
-        throw Exception('DartPad iframe not found');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error sending code to DartPad: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
+
 
   String _prepareCodeForDartPad(String code) {
     // Remove any existing import statements that might conflict
@@ -245,19 +207,6 @@ $cleaned''';
                   ),
                 ),
                 const SizedBox(width: 16),
-                // if (_isFlutterCode) ...[
-                //   ElevatedButton.icon(
-                //     onPressed: _isDartPadReady ? _copyToDartPad : null,
-                //     icon: const Icon(Icons.play_arrow, size: 16),
-                //     label: const Text('Run in DartPad'),
-                //     style: ElevatedButton.styleFrom(
-                //       backgroundColor: Colors.blue,
-                //       foregroundColor: Colors.white,
-                //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                //     ),
-                //   ),
-                //   const SizedBox(width: 8),
-                // ],
                 IconButton(
                   icon: Icon(
                     Icons.copy_all, 
@@ -276,19 +225,20 @@ $cleaned''';
               width: double.infinity,
               color: VSCodeThemes.getBackgroundColor(isDark),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: HighlightView(
-                  _currentContent,
-                  language: 'dart',
-                  theme: VSCodeThemes.getTheme(isDark),
-                  padding: const EdgeInsets.all(12),
-                  textStyle: TextStyle(
+              padding: const EdgeInsets.all(16),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                width: double.infinity,
+                child: SelectableText(
+                       _currentContent,
+                  style: TextStyle(
                     fontFamily: 'Consolas, Monaco, monospace',
                     fontSize: 14,
                     color: VSCodeThemes.getTextColor(isDark),
                   ),
                 ),
               ),
+            ),
             ),
           ),
         ],
@@ -298,12 +248,11 @@ $cleaned''';
     );
   }
 
+
   Widget _buildDartPadViewer() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
       ),
       child: Column(
         children: [
@@ -311,7 +260,6 @@ $cleaned''';
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue[50],
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
@@ -380,9 +328,8 @@ $cleaned''';
             _splitRatio = (_splitRatio + delta).clamp(0.2, 0.8);
           });
         },
-        child: Container(
+        child: SizedBox(
           width: 8,
-          color: Colors.grey[300],
           child: Center(
             child: Container(
               width: 2,
@@ -542,40 +489,63 @@ $cleaned''';
     throw Exception('URL must be a GitHub or GitHub API URL');
   }
 
-  void _showSettingsDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('GitHub Settings'),
-          content: SizedBox(
-            width: 400,
-            child: TextField(
-              controller: _urlController,
-              decoration: const InputDecoration(
-                labelText: 'GitHub URL',
-                hintText: 'e.g., https://github.com/flutter/flutter/blob/main/README.md',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _fetchFileFromUrl();
-              },
-              child: const Text('Fetch File'),
-            ),
-          ],
-        );
-      },
-    );
+  void _checkForUrlParameter() {
+    if (!kIsWeb) return;
+    
+    // Get current URL
+    final currentUrl = Uri.base.toString();
+    
+    // Extract GitHub URL from path (after domain)
+    String? githubUrl = _extractGitHubUrlFromPath(currentUrl);
+    
+    if (githubUrl != null && githubUrl.isNotEmpty) {
+      // Set the URL in the controller
+      _urlController.text = githubUrl;
+      // Auto-fetch the file
+      _fetchFileFromUrl();
+    }
+  }
+
+  String? _extractGitHubUrlFromPath(String fullUrl) {
+    try {
+      final uri = Uri.parse(fullUrl);
+      final path = uri.path;
+      
+      // Check if path contains github.com
+      if (path.contains('github.com')) {
+        // Find the start of the GitHub URL
+        final githubIndex = path.indexOf('https://github.com');
+        if (githubIndex != -1) {
+          // Extract everything from 'https://github.com' onwards
+          final githubUrl = path.substring(githubIndex);
+          return Uri.decodeFull(githubUrl);
+        }
+        
+        // Also handle case where protocol is missing
+        final githubIndexNoProtocol = path.indexOf('github.com');
+        if (githubIndexNoProtocol != -1) {
+          final githubUrl = 'https://${path.substring(githubIndexNoProtocol)}';
+          return Uri.decodeFull(githubUrl);
+        }
+      }
+      
+      // Also check query parameters
+      final githubParam = uri.queryParameters['github'] ?? uri.queryParameters['url'];
+      if (githubParam != null && githubParam.contains('github.com')) {
+        return Uri.decodeFull(githubParam);
+      }
+      
+    } catch (e) {
+      debugPrint('Error parsing URL: $e');
+    }
+    
+    return null;
+  }
+
+  void _toggleUrlField() {
+    setState(() {
+      _showUrlField = !_showUrlField;
+    });
   }
 
   void _fetchFileFromUrl() {
@@ -609,8 +579,11 @@ $cleaned''';
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('GitHub Code Runner'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Row(
+        children: [   
+          Image.asset('assets/flutter_stack_logo.png',  height: 32,),
+        ],
+      ),
         actions: [
           BlocBuilder<ThemeBloc, ThemeState>(
             builder: (context, themeState) {
@@ -621,10 +594,43 @@ $cleaned''';
               );
             },
           ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: _showUrlField ? 300 : 0,
+            child: _showUrlField
+                ? Container(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: TextField(
+                      controller: _urlController,
+                      decoration: InputDecoration(
+                        hintText: 'GitHub URL...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.send),
+                          onPressed: () {
+                            _fetchFileFromUrl();
+                            _toggleUrlField();
+                          },
+                        ),
+                      ),
+                      onSubmitted: (_) {
+                        _fetchFileFromUrl();
+                        _toggleUrlField();
+                      },
+                    ),
+                  )
+                : const SizedBox.shrink(),
+          ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: _showSettingsDialog,
-            tooltip: 'Settings',
+            onPressed: _toggleUrlField,
+            tooltip: 'GitHub URL',
           ),
           if (_currentContent.isNotEmpty && _isFlutterCode)
             IconButton(
